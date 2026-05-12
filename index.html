@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Цветной ASCII-арт из видео</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500&display=swap"
+      rel="stylesheet"
+    />
+    <styles>
+      body { background: #000; margin: 0; padding: 20px; font-family: 'JetBrains
+      Mono', monospace; } canvas, video { /* 854x480 scaled */ width: 320px;
+      height: 240px; border: 5px solid blue; display: block; margin: 10px auto;
+      box-sizing: border-box; position: fixed; inset: 0 0; } div { border-color:
+      pink; font-family: 'JetBrains Mono', monospace !important; font-size: 12px
+      !important; line-height: 1 !important; letter-spacing: 0 !important;
+      font-weight: 400; white-space: pre; background: #000; color: #0f0;
+      overflow: hidden; padding: 0; margin: 10px auto; color: inherit; /* Для
+      span цветов */ position: absolute; inset: 0; } /* Fallback шрифт */
+      @font-face { font-family: 'Fallback Mono'; src: local('Courier New'),
+      local('Consolas'), monospace; font-display: swap; }
+    </styles>
+  </head>
+  <body>
+    <canvas></canvas>
+    <video autoplay="true" muted>Ваш браузер не поддерживает видео.</video>
+    <div></div>
+    <script>
+      var canvas = document.querySelector("canvas");
+      var scaleLevel = 10;
+      canvas.width = 854 / scaleLevel; // ~28 пикселей
+      canvas.height = 480 / scaleLevel; // ~16 пикселей
+
+      var ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+
+      var density = "@%#*+=-:."; // Блочный набор (замените по вкусу)
+
+      var video = document.querySelector("video");
+      var asciiDiv = document.querySelector("div");
+
+      // Запуск камеры
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then(function (stream) {
+            video.srcObject = stream;
+          })
+          .catch(function (error) {
+            console.error("Ошибка камеры:", error);
+            asciiDiv.innerHTML =
+              '<span style="color:#ff0">Разрешите доступ к камере</span>';
+          });
+      }
+
+      function getColoredAscii(imageData) {
+        const width = canvas.width;
+        const data = imageData.data;
+        let html = "";
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            const r = data[i + 0];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Яркость → символ
+            const avg = (r + g + b) / 3;
+            const charIndex = Math.floor((avg / 255) * (density.length - 1));
+            const symbol = density[density.length - 1 - charIndex];
+
+            // Цветной span
+            html += `<span style="color:rgb(${r},${g},${b})">${symbol}</span>`;
+          }
+          // Невидимый spacer для новой строки
+          html += '<span style="color:transparent;"> </span>\n';
+        }
+        return html;
+      }
+
+      // Анимация
+      video.addEventListener(
+        "play",
+        function () {
+          const loop = () => {
+            if (!video.paused && !video.ended) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(
+                0,
+                0,
+                canvas.width,
+                canvas.height,
+              );
+              asciiDiv.innerHTML = getColoredAscii(imageData);
+
+              requestAnimationFrame(loop); // Плавные 60 FPS
+            }
+          };
+          loop();
+        },
+        0,
+      );
+    </script>
+  </body>
+</html>
+
