@@ -9,17 +9,21 @@
       rel="stylesheet"
     />
     <style>
-      body { background: #000; margin: 0; padding: 20px; font-family: 'JetBrains
-      Mono', monospace; } canvas, video { /* 854x480 scaled */ width: 320px;
-      height: 240px; border: 5px solid blue; display: block; margin: 10px auto;
-      box-sizing: border-box; position: fixed; inset: 0 0; } div { border-color:
-      pink; font-family: 'JetBrains Mono', monospace !important; font-size: 12px
-      !important; line-height: 1 !important; letter-spacing: 0 !important;
-      font-weight: 400; white-space: pre; background: #000; color: #0f0;
-      overflow: hidden; padding: 0; margin: 10px auto; color: inherit; /* Для
-      span цветов */ position: absolute; inset: 0; } /* Fallback шрифт */
-      @font-face { font-family: 'Fallback Mono'; src: local('Courier New'),
-      local('Consolas'), monospace; font-display: swap; }
+      body { background: #000; margin: 0; padding: 0; overflow: hidden; }
+      canvas, video { display: none; }
+      div {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        line-height: 1;
+        letter-spacing: 0;
+        font-weight: 400;
+        white-space: pre;
+        background: #000;
+        color: #0f0;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
     </style>
   </head>
   <body>
@@ -27,20 +31,39 @@
     <video autoplay="true" muted>Ваш браузер не поддерживает видео.</video>
     <div></div>
     <script>
-      var canvas = document.querySelector("canvas");
-      var scaleLevel = 10;
-      canvas.width = 854 / scaleLevel; // ~28 пикселей
-      canvas.height = 480 / scaleLevel; // ~16 пикселей
-
-      var ctx = canvas.getContext("2d");
+      const canvas = document.querySelector("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.imageSmoothingEnabled = false;
 
-      var density = "@%#*+=-:."; // Блочный набор (замените по вкусу)
+      const density = "@%#*+=-:.";
+      const densityLen = density.length;
 
-      var video = document.querySelector("video");
-      var asciiDiv = document.querySelector("div");
+      const video = document.querySelector("video");
+      const asciiDiv = document.querySelector("div");
 
-      // Запуск камеры
+      let spanPool = [];
+      let cols = 0;
+      let rows = 0;
+      let lastHtml = "";
+
+      function initPool() {
+        cols = Math.floor(window.innerWidth / 10);
+        rows = Math.floor(window.innerHeight / 10);
+        canvas.width = cols;
+        canvas.height = rows;
+        spanPool = [];
+        const poolSize = cols * rows;
+        for (let i = 0; i < poolSize; i++) {
+          spanPool[i] = document.createElement("span");
+        }
+      }
+
+      initPool();
+
+      new ResizeObserver(() => {
+        initPool();
+      }).observe(document.body);
+
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices
           .getUserMedia({ video: true })
@@ -49,60 +72,55 @@
           })
           .catch(function (error) {
             console.error("Ошибка камеры:", error);
-            asciiDiv.innerHTML =
-              '<span style="color:#ff0">Разрешите доступ к камере</span>';
+            asciiDiv.innerHTML = '<span style="color:#ff0">Разрешите доступ к камере</span>';
           });
       }
 
       function getColoredAscii(imageData) {
-        const width = canvas.width;
+        const width = cols;
+        const height = rows;
         const data = imageData.data;
+        const pool = spanPool;
+        let poolIdx = 0;
         let html = "";
 
-        for (let y = 0; y < canvas.height; y++) {
+        for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4;
-            const r = data[i + 0];
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            const charIdx = ((255 - avg) / 255 * (densityLen - 1)) | 0;
+            const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
 
-            // Яркость → символ
-            const avg = (r + g + b) / 3;
-            const charIndex = Math.floor((avg / 255) * (density.length - 1));
-            const symbol = density[density.length - 1 - charIndex];
-
-            // Цветной span
-            html += `<span style="color:rgb(${r},${g},${b})">${symbol}</span>`;
+            const span = pool[poolIdx++];
+            span.style.color = `rgb(${r},${g},${b})`;
+            span.textContent = density[charIdx];
+            html += span.outerHTML;
           }
-          // Невидимый spacer для новой строки
-          html += '<span style="color:transparent;"> </span>\n';
+          html += '\n';
         }
         return html;
       }
 
-      // Анимация
-      video.addEventListener(
-        "play",
-        function () {
-          const loop = () => {
-            if (!video.paused && !video.ended) {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const imageData = ctx.getImageData(
-                0,
-                0,
-                canvas.width,
-                canvas.height,
-              );
-              asciiDiv.innerHTML = getColoredAscii(imageData);
+      let animationId;
 
-              requestAnimationFrame(loop); // Плавные 60 FPS
-            }
-          };
-          loop();
-        },
-        0,
-      );
+      function loop() {
+        if (!video.paused && !video.ended) {
+          ctx.drawImage(video, 0, 0, cols, rows);
+          const currentFrame = ctx.getImageData(0, 0, cols, rows);
+          const html = getColoredAscii(currentFrame);
+          if (html !== lastHtml) {
+            asciiDiv.innerHTML = html;
+            lastHtml = html;
+          }
+          animationId = requestAnimationFrame(loop);
+        }
+      }
+
+      video.addEventListener("play", () => loop(), 0);
+      video.addEventListener("pause", () => cancelAnimationFrame(animationId));
+      video.addEventListener("ended", () => cancelAnimationFrame(animationId));
     </script>
   </body>
 </html>
-
