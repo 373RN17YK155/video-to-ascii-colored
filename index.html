@@ -32,6 +32,8 @@
       let cols = 0;
       let rows = 0;
       let imageData = null;
+      let offscreenCanvas = null;
+      let offscreenCtx = null;
 
       function initCanvas() {
         const newCols = Math.floor(window.innerWidth / 10);
@@ -44,7 +46,11 @@
         canvas.width = cols * 10;
         canvas.height = rows * 10;
 
-        imageData = ctx.createImageData(cols, rows);
+        offscreenCanvas = new OffscreenCanvas(cols, rows);
+        offscreenCtx = offscreenCanvas.getContext("2d", { willReadFrequently: true });
+        offscreenCtx.imageSmoothingEnabled = false;
+        
+        imageData = offscreenCtx.createImageData(cols, rows);
       }
 
       initCanvas();
@@ -68,16 +74,14 @@
       video.addEventListener("canplay", async () => {
         console.log("canplay fired");
         console.log("Video dimensions:", video.videoWidth, video.videoHeight);
-        console.log("Canvas dimensions:", canvas.width, canvas.height);
         console.log("cols:", cols, "rows:", rows);
         
         try {
           const bitmap = await createImageBitmap(video);
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(bitmap, 0, 0, cols, rows);
+          offscreenCtx.drawImage(bitmap, 0, 0, cols, rows);
           bitmap.close();
           
-          const data = ctx.getImageData(0, 0, cols, rows).data;
+          const data = offscreenCtx.getImageData(0, 0, cols, rows).data;
           console.log("Sample pixel data:", data[0], data[1], data[2], data[3]);
           updateAscii(imageData);
         } catch (e) {
@@ -109,9 +113,12 @@
 
       function loop() {
         if (!video.paused && !video.ended) {
-          ctx.drawImage(video, 0, 0, cols, rows);
-          ctx.getImageData(0, 0, cols, rows, imageData);
-          updateAscii(imageData);
+          createImageBitmap(video).then(bitmap => {
+            offscreenCtx.drawImage(bitmap, 0, 0, cols, rows);
+            bitmap.close();
+            offscreenCtx.getImageData(0, 0, cols, rows, imageData);
+            updateAscii(imageData);
+          });
           animationId = requestAnimationFrame(loop);
         }
       }
