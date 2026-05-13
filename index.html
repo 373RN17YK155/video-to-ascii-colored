@@ -21,8 +21,6 @@
       const canvas = document.querySelector("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.imageSmoothingEnabled = false;
-      ctx.font = '12px JetBrains Mono, monospace';
-      ctx.textBaseline = 'top';
 
       const density = "@%#*+=-:.";
       const densityLen = density.length;
@@ -32,9 +30,6 @@
 
       let cols = 0;
       let rows = 0;
-      let offscreenCanvas = null;
-      let offscreenCtx = null;
-      let captureVideo = null;
 
       function initCanvas() {
         const newCols = Math.floor(window.innerWidth / scale);
@@ -46,10 +41,9 @@
         rows = newRows;
         canvas.width = cols * scale;
         canvas.height = rows * scale;
-
-        offscreenCanvas = new OffscreenCanvas(video.videoWidth || 640, video.videoHeight || 480);
-        offscreenCtx = offscreenCanvas.getContext("2d", { willReadFrequently: true });
-        offscreenCtx.imageSmoothingEnabled = false;
+        
+        ctx.font = `${scale}px monospace`;
+        ctx.textBaseline = 'top';
       }
 
       initCanvas();
@@ -62,11 +56,6 @@
         navigator.mediaDevices
           .getUserMedia({ video: true })
           .then(function (stream) {
-            captureVideo = document.createElement("video");
-            captureVideo.srcObject = stream.clone();
-            captureVideo.muted = true;
-            captureVideo.playsInline = true;
-            captureVideo.autoplay = true;
             video.srcObject = stream;
           })
           .catch(function (error) {
@@ -75,10 +64,11 @@
       }
 
       function updateAscii() {
-        offscreenCtx.drawImage(captureVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        const srcWidth = video.videoWidth;
+        const srcHeight = video.videoHeight;
         
-        const srcWidth = offscreenCanvas.width;
-        const srcHeight = offscreenCanvas.height;
+        ctx.drawImage(video, 0, 0);
+        
         const stepX = srcWidth / cols;
         const stepY = srcHeight / rows;
 
@@ -89,8 +79,7 @@
           for (let x = 0; x < cols; x++) {
             const srcX = (x * stepX) | 0;
             const srcY = (y * stepY) | 0;
-            const i = (srcY * srcWidth + srcX) * 4;
-            const data = offscreenCtx.getImageData(srcX, srcY, 1, 1).data;
+            const data = ctx.getImageData(srcX, srcY, 1, 1).data;
 
             const r = data[0];
             const g = data[1];
@@ -105,7 +94,7 @@
       }
 
       function loop() {
-        if (captureVideo && captureVideo.readyState >= 2) {
+        if (video.readyState >= 2) {
           updateAscii();
         }
         requestAnimationFrame(loop);
