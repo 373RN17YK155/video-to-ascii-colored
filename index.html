@@ -10,7 +10,7 @@
     />
     <style>
       body { background: #000; margin: 0; padding: 0; overflow: hidden; }
-      canvas, video { display: none; }
+      canvas, video { display: block; max-widht: 0; max-height: 0; }
       div {
         font-family: 'JetBrains Mono', monospace;
         font-size: 12px;
@@ -21,8 +21,7 @@
         background: #000;
         color: #0f0;
         position: absolute;
-        top: 0;
-        left: 0;
+        inset: 0;
       }
     </style>
   </head>
