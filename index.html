@@ -4,36 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Цветной ASCII-арт из видео</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <style>
       body { background: #000; margin: 0; padding: 0; overflow: hidden; }
       canvas, video { display: block; max-width: 0; max-height: 0; }
-      #ascii {
-        font-family: monospace;
-        font-size: 12px;
-        line-height: 1;
-        letter-spacing: 0;
-        white-space: pre;
-        background: #000;
-        color: #0f0;
-        position: absolute;
-        inset: 0;
-      }
     </style>
   </head>
   <body>
+    <canvas id="display"></canvas>
     <canvas id="capture" style="display:none"></canvas>
     <video autoplay="true" muted playsinline></video>
-    <div id="ascii"></div>
     <script>
       const captureCanvas = document.getElementById("capture");
       const captureCtx = captureCanvas.getContext("2d", { willReadFrequently: true });
       captureCtx.imageSmoothingEnabled = false;
 
-      const asciiDiv = document.getElementById("ascii");
+      const displayCanvas = document.getElementById("display");
+      const displayCtx = displayCanvas.getContext("2d");
+      displayCtx.imageSmoothingEnabled = false;
 
       const density = "@%#*+=-:.";
       const densityLen = density.length;
@@ -43,38 +33,18 @@
 
       let cols = 0;
       let rows = 0;
-      let spanPool = [];
+      let asciiText = "";
 
       function initCanvas() {
-        const newCols = Math.floor(window.innerWidth / scale);
-        const newRows = Math.floor(window.innerHeight / scale);
-
-        if (newCols === cols && newRows === rows) return;
-
-        cols = newCols;
-        rows = newRows;
+        cols = Math.floor(window.innerWidth / scale);
+        rows = Math.floor(window.innerHeight / scale);
+        displayCanvas.width = cols * scale;
+        displayCanvas.height = rows * scale;
         captureCanvas.width = 640;
         captureCanvas.height = 480;
-
-        const totalSpans = cols * rows;
-
-        if (spanPool.length < totalSpans) {
-          const toAdd = totalSpans - spanPool.length;
-          const fragment = document.createDocumentFragment();
-          for (let i = 0; i < toAdd; i++) {
-            const span = document.createElement("span");
-            spanPool.push(span);
-            fragment.appendChild(span);
-          }
-          asciiDiv.appendChild(fragment);
-        }
-
-        for (let i = 0; i < totalSpans; i++) {
-          spanPool[i].style.display = "inline";
-        }
-        for (let i = totalSpans; i < spanPool.length; i++) {
-          spanPool[i].style.display = "none";
-        }
+        
+        displayCtx.font = `${scale}px 'JetBrains Mono', monospace`;
+        displayCtx.textBaseline = 'top';
       }
 
       initCanvas();
@@ -110,12 +80,13 @@
           return;
         }
         
-        console.log("Sample pixels:", data[0], data[1], data[2], data[3]);
-        
         const srcWidth = captureCanvas.width;
         const srcHeight = captureCanvas.height;
         const stepX = srcWidth / cols;
         const stepY = srcHeight / rows;
+
+        displayCtx.fillStyle = '#000';
+        displayCtx.fillRect(0, 0, displayCanvas.width, displayCanvas.height);
 
         for (let y = 0; y < rows; y++) {
           for (let x = 0; x < cols; x++) {
@@ -129,11 +100,9 @@
             const avg = (r + g + b) / 3;
             const charIdx = ((255 - avg) / 255 * (densityLen - 1)) | 0;
 
-            const span = spanPool[y * cols + x];
-            span.textContent = density[charIdx];
-            span.style.color = `rgb(${r},${g},${b})`;
+            displayCtx.fillStyle = `rgb(${r},${g},${b})`;
+            displayCtx.fillText(density[charIdx], x * scale, y * scale);
           }
-          spanPool[y * cols + cols - 1].textContent += "\n";
         }
       }
 
