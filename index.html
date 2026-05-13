@@ -16,7 +16,7 @@
   </head>
   <body>
     <canvas></canvas>
-    <video autoplay="true" muted></video>
+    <video autoplay="true" muted crossOrigin="anonymous"></video>
     <script>
       const canvas = document.querySelector("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -66,8 +66,12 @@
       }
 
       video.addEventListener("loadeddata", () => {
+        console.log("Video dimensions:", video.videoWidth, video.videoHeight);
+        console.log("Canvas dimensions:", canvas.width, canvas.height);
+        console.log("cols:", cols, "rows:", rows);
         ctx.drawImage(video, 0, 0, cols, rows);
-        ctx.getImageData(0, 0, cols, rows, imageData);
+        const data = ctx.getImageData(0, 0, cols, rows).data;
+        console.log("Sample pixel data:", data[0], data[1], data[2], data[3]);
         updateAscii(imageData);
       }, { once: true });
 
