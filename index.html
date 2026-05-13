@@ -26,22 +26,30 @@
 
       const density = "@%#*+=-:.";
       const densityLen = density.length;
+      const scale = 12;
 
       const video = document.querySelector("video");
 
       let cols = 0;
       let rows = 0;
+      let offscreenCanvas = null;
+      let offscreenCtx = null;
+      let captureVideo = null;
 
       function initCanvas() {
-        const newCols = Math.floor(window.innerWidth / 10);
-        const newRows = Math.floor(window.innerHeight / 10);
+        const newCols = Math.floor(window.innerWidth / scale);
+        const newRows = Math.floor(window.innerHeight / scale);
 
         if (newCols === cols && newRows === rows) return;
 
         cols = newCols;
         rows = newRows;
-        canvas.width = cols * 10;
-        canvas.height = rows * 10;
+        canvas.width = cols * scale;
+        canvas.height = rows * scale;
+
+        offscreenCanvas = new OffscreenCanvas(video.videoWidth || 640, video.videoHeight || 480);
+        offscreenCtx = offscreenCanvas.getContext("2d", { willReadFrequently: true });
+        offscreenCtx.imageSmoothingEnabled = false;
       }
 
       initCanvas();
@@ -54,6 +62,11 @@
         navigator.mediaDevices
           .getUserMedia({ video: true })
           .then(function (stream) {
+            captureVideo = document.createElement("video");
+            captureVideo.srcObject = stream.clone();
+            captureVideo.muted = true;
+            captureVideo.playsInline = true;
+            captureVideo.autoplay = true;
             video.srcObject = stream;
           })
           .catch(function (error) {
@@ -61,8 +74,40 @@
           });
       }
 
+      function updateAscii() {
+        offscreenCtx.drawImage(captureVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+        
+        const srcWidth = offscreenCanvas.width;
+        const srcHeight = offscreenCanvas.height;
+        const stepX = srcWidth / cols;
+        const stepY = srcHeight / rows;
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            const srcX = (x * stepX) | 0;
+            const srcY = (y * stepY) | 0;
+            const i = (srcY * srcWidth + srcX) * 4;
+            const data = offscreenCtx.getImageData(srcX, srcY, 1, 1).data;
+
+            const r = data[0];
+            const g = data[1];
+            const b = data[2];
+            const avg = (r + g + b) / 3;
+            const charIdx = ((255 - avg) / 255 * (densityLen - 1)) | 0;
+
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillText(density[charIdx], x * scale, y * scale);
+          }
+        }
+      }
+
       function loop() {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (captureVideo && captureVideo.readyState >= 2) {
+          updateAscii();
+        }
         requestAnimationFrame(loop);
       }
 
