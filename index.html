@@ -10,17 +10,30 @@
     />
     <style>
       body { background: #000; margin: 0; padding: 0; overflow: hidden; }
-      video { display: block; max-width: 0; max-height: 0; }
-      canvas { display: block; }
+      canvas, video { display: block; max-width: 0; max-height: 0; }
+      #ascii {
+        font-family: monospace;
+        font-size: 12px;
+        line-height: 1;
+        letter-spacing: 0;
+        white-space: pre;
+        background: #000;
+        color: #0f0;
+        position: absolute;
+        inset: 0;
+      }
     </style>
   </head>
   <body>
-    <canvas></canvas>
+    <canvas id="capture" style="display:none"></canvas>
     <video autoplay="true" muted playsinline></video>
+    <div id="ascii"></div>
     <script>
-      const canvas = document.querySelector("canvas");
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.imageSmoothingEnabled = false;
+      const captureCanvas = document.getElementById("capture");
+      const captureCtx = captureCanvas.getContext("2d", { willReadFrequently: true });
+      captureCtx.imageSmoothingEnabled = false;
+
+      const asciiDiv = document.getElementById("ascii");
 
       const density = "@%#*+=-:.";
       const densityLen = density.length;
@@ -30,6 +43,7 @@
 
       let cols = 0;
       let rows = 0;
+      let spanPool = [];
 
       function initCanvas() {
         const newCols = Math.floor(window.innerWidth / scale);
@@ -39,11 +53,28 @@
 
         cols = newCols;
         rows = newRows;
-        canvas.width = cols * scale;
-        canvas.height = rows * scale;
-        
-        ctx.font = `${scale}px monospace`;
-        ctx.textBaseline = 'top';
+        captureCanvas.width = 640;
+        captureCanvas.height = 480;
+
+        const totalSpans = cols * rows;
+
+        if (spanPool.length < totalSpans) {
+          const toAdd = totalSpans - spanPool.length;
+          const fragment = document.createDocumentFragment();
+          for (let i = 0; i < toAdd; i++) {
+            const span = document.createElement("span");
+            spanPool.push(span);
+            fragment.appendChild(span);
+          }
+          asciiDiv.appendChild(fragment);
+        }
+
+        for (let i = 0; i < totalSpans; i++) {
+          spanPool[i].style.display = "inline";
+        }
+        for (let i = totalSpans; i < spanPool.length; i++) {
+          spanPool[i].style.display = "none";
+        }
       }
 
       initCanvas();
@@ -64,31 +95,45 @@
       }
 
       function updateAscii() {
-        const srcWidth = video.videoWidth;
-        const srcHeight = video.videoHeight;
+        try {
+          captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+        } catch (e) {
+          console.error("drawImage error:", e);
+          return;
+        }
         
-        ctx.drawImage(video, 0, 0);
+        let data;
+        try {
+          data = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height).data;
+        } catch (e) {
+          console.error("getImageData error (canvas tainted):", e);
+          return;
+        }
         
+        console.log("Sample pixels:", data[0], data[1], data[2], data[3]);
+        
+        const srcWidth = captureCanvas.width;
+        const srcHeight = captureCanvas.height;
         const stepX = srcWidth / cols;
         const stepY = srcHeight / rows;
 
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let poolIdx = 0;
 
         for (let y = 0; y < rows; y++) {
           for (let x = 0; x < cols; x++) {
             const srcX = (x * stepX) | 0;
             const srcY = (y * stepY) | 0;
-            const data = ctx.getImageData(srcX, srcY, 1, 1).data;
+            const i = (srcY * srcWidth + srcX) * 4;
 
-            const r = data[0];
-            const g = data[1];
-            const b = data[2];
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
             const avg = (r + g + b) / 3;
             const charIdx = ((255 - avg) / 255 * (densityLen - 1)) | 0;
 
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.fillText(density[charIdx], x * scale, y * scale);
+            const span = spanPool[poolIdx++];
+            span.textContent = density[charIdx];
+            span.style.color = `rgb(${r},${g},${b})`;
           }
         }
       }
