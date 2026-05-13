@@ -65,14 +65,19 @@
           });
       }
 
-      video.addEventListener("loadeddata", () => {
+      video.addEventListener("canplay", () => {
+        console.log("canplay fired");
         console.log("Video dimensions:", video.videoWidth, video.videoHeight);
         console.log("Canvas dimensions:", canvas.width, canvas.height);
         console.log("cols:", cols, "rows:", rows);
-        ctx.drawImage(video, 0, 0, cols, rows);
-        const data = ctx.getImageData(0, 0, cols, rows).data;
-        console.log("Sample pixel data:", data[0], data[1], data[2], data[3]);
-        updateAscii(imageData);
+        
+        requestAnimationFrame(() => {
+          console.log("In rAF");
+          ctx.drawImage(video, 0, 0, cols, rows);
+          const data = ctx.getImageData(0, 0, cols, rows).data;
+          console.log("Sample pixel data:", data[0], data[1], data[2], data[3]);
+          updateAscii(imageData);
+        });
       }, { once: true });
 
       function updateAscii(imageData) {
