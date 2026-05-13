@@ -40,20 +40,43 @@
       const video = document.querySelector("video");
       const asciiDiv = document.querySelector("div");
 
-      let spanPool = [];
       let cols = 0;
       let rows = 0;
-      let lastHtml = "";
+      let imageData = null;
+      let spanPool = [];
+      let frameCount = 0;
 
       function initPool() {
-        cols = Math.floor(window.innerWidth / 10);
-        rows = Math.floor(window.innerHeight / 10);
+        const newCols = Math.floor(window.innerWidth / 10);
+        const newRows = Math.floor(window.innerHeight / 10);
+
+        if (newCols === cols && newRows === rows) return;
+
+        cols = newCols;
+        rows = newRows;
         canvas.width = cols;
         canvas.height = rows;
-        spanPool = [];
-        const poolSize = cols * rows;
-        for (let i = 0; i < poolSize; i++) {
-          spanPool[i] = document.createElement("span");
+
+        imageData = ctx.createImageData(cols, rows);
+
+        const totalSpans = cols * rows;
+
+        if (spanPool.length < totalSpans) {
+          const toAdd = totalSpans - spanPool.length;
+          const fragment = document.createDocumentFragment();
+          for (let i = 0; i < toAdd; i++) {
+            const span = document.createElement("span");
+            spanPool.push(span);
+            fragment.appendChild(span);
+          }
+          asciiDiv.appendChild(fragment);
+        }
+
+        for (let i = 0; i < totalSpans; i++) {
+          spanPool[i].style.display = "inline";
+        }
+        for (let i = totalSpans; i < spanPool.length; i++) {
+          spanPool[i].style.display = "none";
         }
       }
 
@@ -71,17 +94,17 @@
           })
           .catch(function (error) {
             console.error("Ошибка камеры:", error);
-            asciiDiv.innerHTML = '<span style="color:#ff0">Разрешите доступ к камере</span>';
+            asciiDiv.textContent = "Разрешите доступ к камере";
+            spanPool[0].style.color = "#ff0";
           });
       }
 
-      function getColoredAscii(imageData) {
+      function updateAscii(imageData) {
+        const data = imageData.data;
         const width = cols;
         const height = rows;
-        const data = imageData.data;
         const pool = spanPool;
         let poolIdx = 0;
-        let html = "";
 
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
@@ -93,13 +116,10 @@
             const b = data[i + 2];
 
             const span = pool[poolIdx++];
-            span.style.color = `rgb(${r},${g},${b})`;
             span.textContent = density[charIdx];
-            html += span.outerHTML;
+            span.style.color = `rgb(${r},${g},${b})`;
           }
-          html += '\n';
         }
-        return html;
       }
 
       let animationId;
@@ -107,12 +127,8 @@
       function loop() {
         if (!video.paused && !video.ended) {
           ctx.drawImage(video, 0, 0, cols, rows);
-          const currentFrame = ctx.getImageData(0, 0, cols, rows);
-          const html = getColoredAscii(currentFrame);
-          if (html !== lastHtml) {
-            asciiDiv.innerHTML = html;
-            lastHtml = html;
-          }
+          ctx.getImageData(0, 0, cols, rows, imageData);
+          updateAscii(imageData);
           animationId = requestAnimationFrame(loop);
         }
       }
