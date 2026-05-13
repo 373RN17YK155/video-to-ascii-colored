@@ -60,15 +60,16 @@
             video.srcObject = stream;
             video.play();
           })
-          .then(() => {
-            ctx.drawImage(video, 0, 0, cols, rows);
-            ctx.getImageData(0, 0, cols, rows, imageData);
-            updateAscii(imageData);
-          })
           .catch(function (error) {
             console.error("Ошибка камеры:", error);
           });
       }
+
+      video.addEventListener("loadeddata", () => {
+        ctx.drawImage(video, 0, 0, cols, rows);
+        ctx.getImageData(0, 0, cols, rows, imageData);
+        updateAscii(imageData);
+      }, { once: true });
 
       function updateAscii(imageData) {
         const data = imageData.data;
