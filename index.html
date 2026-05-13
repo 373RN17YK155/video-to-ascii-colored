@@ -10,43 +10,30 @@
     />
     <style>
       body { background: #000; margin: 0; padding: 0; overflow: hidden; }
-      canvas, video { display: block; max-widht: 0; max-height: 0; }
-      div {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 12px;
-        line-height: 1;
-        letter-spacing: 0;
-        font-weight: 400;
-        white-space: pre;
-        background: #000;
-        color: #0f0;
-        position: absolute;
-        inset: 0;
-      }
+      video { display: block; max-width: 0; max-height: 0; }
+      canvas { display: block; }
     </style>
   </head>
   <body>
     <canvas></canvas>
-    <video autoplay="true" muted>Ваш браузер не поддерживает видео.</video>
-    <div></div>
+    <video autoplay="true" muted></video>
     <script>
       const canvas = document.querySelector("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.imageSmoothingEnabled = false;
+      ctx.font = '12px JetBrains Mono, monospace';
+      ctx.textBaseline = 'top';
 
       const density = "@%#*+=-:.";
       const densityLen = density.length;
 
       const video = document.querySelector("video");
-      const asciiDiv = document.querySelector("div");
 
       let cols = 0;
       let rows = 0;
       let imageData = null;
-      let spanPool = [];
-      let frameCount = 0;
 
-      function initPool() {
+      function initCanvas() {
         const newCols = Math.floor(window.innerWidth / 10);
         const newRows = Math.floor(window.innerHeight / 10);
 
@@ -54,36 +41,16 @@
 
         cols = newCols;
         rows = newRows;
-        canvas.width = cols;
-        canvas.height = rows;
+        canvas.width = cols * 10;
+        canvas.height = rows * 10;
 
         imageData = ctx.createImageData(cols, rows);
-
-        const totalSpans = cols * rows;
-
-        if (spanPool.length < totalSpans) {
-          const toAdd = totalSpans - spanPool.length;
-          const fragment = document.createDocumentFragment();
-          for (let i = 0; i < toAdd; i++) {
-            const span = document.createElement("span");
-            spanPool.push(span);
-            fragment.appendChild(span);
-          }
-          asciiDiv.appendChild(fragment);
-        }
-
-        for (let i = 0; i < totalSpans; i++) {
-          spanPool[i].style.display = "inline";
-        }
-        for (let i = totalSpans; i < spanPool.length; i++) {
-          spanPool[i].style.display = "none";
-        }
       }
 
-      initPool();
+      initCanvas();
 
       new ResizeObserver(() => {
-        initPool();
+        initCanvas();
       }).observe(document.body);
 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -91,11 +58,15 @@
           .getUserMedia({ video: true })
           .then(function (stream) {
             video.srcObject = stream;
+            video.play();
+          })
+          .then(() => {
+            ctx.drawImage(video, 0, 0, cols, rows);
+            ctx.getImageData(0, 0, cols, rows, imageData);
+            updateAscii(imageData);
           })
           .catch(function (error) {
             console.error("Ошибка камеры:", error);
-            asciiDiv.textContent = "Разрешите доступ к камере";
-            spanPool[0].style.color = "#ff0";
           });
       }
 
@@ -103,21 +74,18 @@
         const data = imageData.data;
         const width = cols;
         const height = rows;
-        const pool = spanPool;
-        let poolIdx = 0;
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4;
             const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
             const charIdx = ((255 - avg) / 255 * (densityLen - 1)) | 0;
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
 
-            const span = pool[poolIdx++];
-            span.textContent = density[charIdx];
-            span.style.color = `rgb(${r},${g},${b})`;
+            ctx.fillStyle = `rgb(${data[i]},${data[i+1]},${data[i+2]})`;
+            ctx.fillText(density[charIdx], x * 10, y * 10);
           }
         }
       }
