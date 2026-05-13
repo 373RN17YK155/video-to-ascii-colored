@@ -117,8 +117,6 @@
         const stepX = srcWidth / cols;
         const stepY = srcHeight / rows;
 
-        let poolIdx = 0;
-
         for (let y = 0; y < rows; y++) {
           for (let x = 0; x < cols; x++) {
             const srcX = (x * stepX) | 0;
@@ -131,10 +129,11 @@
             const avg = (r + g + b) / 3;
             const charIdx = ((255 - avg) / 255 * (densityLen - 1)) | 0;
 
-            const span = spanPool[poolIdx++];
+            const span = spanPool[y * cols + x];
             span.textContent = density[charIdx];
             span.style.color = `rgb(${r},${g},${b})`;
           }
+          spanPool[y * cols + cols - 1].textContent += "\n";
         }
       }
 
