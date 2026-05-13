@@ -64,30 +64,17 @@
           .getUserMedia({ video: true })
           .then(function (stream) {
             video.srcObject = stream;
-            video.play();
           })
           .catch(function (error) {
             console.error("Ошибка камеры:", error);
           });
       }
 
-      video.addEventListener("canplay", async () => {
-        console.log("canplay fired");
-        console.log("Video dimensions:", video.videoWidth, video.videoHeight);
+      video.addEventListener("playing", () => {
+        console.log("video started playing");
         console.log("cols:", cols, "rows:", rows);
-        
-        try {
-          const bitmap = await createImageBitmap(video);
-          offscreenCtx.drawImage(bitmap, 0, 0, cols, rows);
-          bitmap.close();
-          
-          const data = offscreenCtx.getImageData(0, 0, cols, rows).data;
-          console.log("Sample pixel data:", data[0], data[1], data[2], data[3]);
-          updateAscii(imageData);
-        } catch (e) {
-          console.error("createImageBitmap error:", e);
-        }
-      }, { once: true });
+        loop();
+      });
 
       function updateAscii(imageData) {
         const data = imageData.data;
@@ -112,18 +99,18 @@
       let animationId;
 
       function loop() {
-        if (!video.paused && !video.ended) {
-          createImageBitmap(video).then(bitmap => {
-            offscreenCtx.drawImage(bitmap, 0, 0, cols, rows);
-            bitmap.close();
+        if (video.readyState >= 2) {
+          try {
+            offscreenCtx.drawImage(video, 0, 0, cols, rows);
             offscreenCtx.getImageData(0, 0, cols, rows, imageData);
             updateAscii(imageData);
-          });
-          animationId = requestAnimationFrame(loop);
+          } catch (e) {
+            console.error("drawImage error:", e);
+          }
         }
+        animationId = requestAnimationFrame(loop);
       }
 
-      video.addEventListener("play", () => loop(), 0);
       video.addEventListener("pause", () => cancelAnimationFrame(animationId));
       video.addEventListener("ended", () => cancelAnimationFrame(animationId));
     </script>
