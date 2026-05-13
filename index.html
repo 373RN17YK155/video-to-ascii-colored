@@ -16,7 +16,7 @@
   </head>
   <body>
     <canvas></canvas>
-    <video autoplay="true" muted crossOrigin="anonymous"></video>
+    <video autoplay="true" muted playsinline></video>
     <script>
       const canvas = document.querySelector("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -31,9 +31,6 @@
 
       let cols = 0;
       let rows = 0;
-      let imageData = null;
-      let offscreenCanvas = null;
-      let offscreenCtx = null;
 
       function initCanvas() {
         const newCols = Math.floor(window.innerWidth / 10);
@@ -45,12 +42,6 @@
         rows = newRows;
         canvas.width = cols * 10;
         canvas.height = rows * 10;
-
-        offscreenCanvas = new OffscreenCanvas(cols, rows);
-        offscreenCtx = offscreenCanvas.getContext("2d", { willReadFrequently: true });
-        offscreenCtx.imageSmoothingEnabled = false;
-        
-        imageData = offscreenCtx.createImageData(cols, rows);
       }
 
       initCanvas();
@@ -70,49 +61,12 @@
           });
       }
 
-      video.addEventListener("playing", () => {
-        console.log("video started playing");
-        console.log("cols:", cols, "rows:", rows);
-        loop();
-      });
-
-      function updateAscii(imageData) {
-        const data = imageData.data;
-        const width = cols;
-        const height = rows;
-
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const i = (y * width + x) * 4;
-            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            const charIdx = ((255 - avg) / 255 * (densityLen - 1)) | 0;
-
-            ctx.fillStyle = `rgb(${data[i]},${data[i+1]},${data[i+2]})`;
-            ctx.fillText(density[charIdx], x * 10, y * 10);
-          }
-        }
-      }
-
-      let animationId;
-
       function loop() {
-        if (video.readyState >= 2) {
-          try {
-            offscreenCtx.drawImage(video, 0, 0, cols, rows);
-            offscreenCtx.getImageData(0, 0, cols, rows, imageData);
-            updateAscii(imageData);
-          } catch (e) {
-            console.error("drawImage error:", e);
-          }
-        }
-        animationId = requestAnimationFrame(loop);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(loop);
       }
 
-      video.addEventListener("pause", () => cancelAnimationFrame(animationId));
-      video.addEventListener("ended", () => cancelAnimationFrame(animationId));
+      video.addEventListener("playing", () => loop());
     </script>
   </body>
 </html>
