@@ -34,15 +34,14 @@
 
       let cols = 0;
       let rows = 0;
-      let asciiText = "";
 
       function initCanvas() {
         displayCanvas.width = window.innerWidth;
         displayCanvas.height = window.innerHeight;
-        captureCanvas.width = video.videoWidth || 1920;
-        captureCanvas.height = video.videoHeight || 1080;
         cols = Math.floor(displayCanvas.width / scale);
         rows = Math.floor(displayCanvas.height / scale);
+        captureCanvas.width = cols;
+        captureCanvas.height = rows;
         
         displayCtx.font = `${scale}px 'JetBrains Mono', monospace`;
         displayCtx.textBaseline = 'top';
@@ -55,6 +54,8 @@
         displayCanvas.height = window.innerHeight;
         cols = Math.floor(displayCanvas.width / scale);
         rows = Math.floor(displayCanvas.height / scale);
+        captureCanvas.width = cols;
+        captureCanvas.height = rows;
       }).observe(document.body);
 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -70,7 +71,7 @@
 
       function updateAscii() {
         try {
-          captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+          captureCtx.drawImage(video, 0, 0, cols, rows);
         } catch (e) {
           console.error("drawImage error:", e);
           return;
@@ -78,25 +79,18 @@
         
         let data;
         try {
-          data = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height).data;
+          data = captureCtx.getImageData(0, 0, cols, rows).data;
         } catch (e) {
           console.error("getImageData error (canvas tainted):", e);
           return;
         }
-        
-        const srcWidth = captureCanvas.width;
-        const srcHeight = captureCanvas.height;
-        const stepX = srcWidth / cols;
-        const stepY = srcHeight / rows;
 
         displayCtx.fillStyle = '#000';
         displayCtx.fillRect(0, 0, displayCanvas.width, displayCanvas.height);
 
         for (let y = 0; y < rows; y++) {
           for (let x = 0; x < cols; x++) {
-            const srcX = (x * stepX) | 0;
-            const srcY = (y * stepY) | 0;
-            const i = (srcY * srcWidth + srcX) * 4;
+            const i = (y * cols + x) * 4;
 
             const r = data[i];
             const g = data[i + 1];
